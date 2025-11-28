@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
 
         // Construir objeto WHERE dinâmico para filtros
         const where = {
-            isPublished: true,
+            isActive: true,
             AND: [],
         };
 
@@ -77,7 +77,7 @@ router.get('/', async (req, res) => {
             prisma.product.findMany({
                 where: where,
                 include: {
-                    images: { where: { isPrimary: true }, select: { url: true } },
+                    images: { where: { isPrimary: true }, select: { imageUrl: true } },
                     category: { select: { name: true, slug: true } },
                     brand: { select: { name: true, slug: true } },
                 },

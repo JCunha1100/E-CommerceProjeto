@@ -141,7 +141,7 @@ model Product {
   slug                            String          @unique
   description                     String?         @db.Text
   shortDescription                String?         @map("short_description") @db.Text
-  sku                             String          @unique 
+  sku                             String?         @unique  // SKU é principalmente das variantes, deixado aqui para compatibilidade
   brandId                         Int?            @map("brand_id") // FK
   categoryId                      Int?            @map("category_id") // FK
   

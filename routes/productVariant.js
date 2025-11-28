@@ -5,7 +5,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireAdmin } from '../utils/auth.js';
 import { validateRequest } from '../utils/validateRequest.js';
-import { productVariantCreateSchema, productVariantUpdateSchema } from '../utils/schemas.js'; 
+import { productVariantCreateSchema, productVariantUpdateSchema } from '../utils/schemas.js';
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -20,7 +20,7 @@ router.post('/', authenticateToken, requireAdmin, validateRequest(productVariant
         const numericStock = parseInt(stock);
         const numericPriceAdjustment = priceAdjustment !== undefined ? parseFloat(priceAdjustment) : 0.0;
 
-        // Verifica se produto existe
+        // Verifica se produto existe e obtém o preço base
         const product = await prisma.product.findUnique({ where: { id: numericProductId } });
         if (!product) {
             return res.status(404).json({ error: 'Produto não encontrado.' });
@@ -44,14 +44,23 @@ router.post('/', authenticateToken, requireAdmin, validateRequest(productVariant
             return res.status(409).json({ error: 'O SKU fornecido já existe no sistema. O SKU deve ser único.' });
         }
 
+        // Calcula preço da variante (preço do produto + ajuste)
+        const basePrice = product.price || 0;
+        const variantPrice = basePrice + numericPriceAdjustment;
+        
+        // Gera título automaticamente (ex: "Tamanho 38")
+        const title = `${product.name} - Tamanho ${size}`;
+
         // Cria nova variação
         const newVariant = await prisma.productVariant.create({
             data: {
                 productId: numericProductId,
+                title,
                 size,
                 stock: numericStock,
                 sku,
-                priceAdjustment: numericPriceAdjustment,
+                price: variantPrice,
+                costPrice: basePrice, // Por defeito, usa o preço base do produto
             },
         });
 

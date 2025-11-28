@@ -12,7 +12,7 @@ export const validateRequest = (schema) => {
       next();
     } catch (error) {
       // Formata erros Zod em estrutura legível (caminho do campo + mensagem)
-      if (error instanceof ZodError) {
+      if (error instanceof ZodError && error.errors) {
         const formattedErrors = error.errors.map((err) => ({
           path: err.path.join('.'),
           message: err.message,
@@ -22,7 +22,8 @@ export const validateRequest = (schema) => {
           details: formattedErrors,
         });
       }
-      res.status(500).json({ error: 'Erro ao processar requisição' });
+      console.error('Erro de validação:', error);
+      res.status(400).json({ error: 'Erro ao validar requisição', details: error.message });
     }
   };
 };

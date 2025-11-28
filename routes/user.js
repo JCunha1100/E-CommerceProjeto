@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { hashPassword, checkPassword, signToken, authenticateToken } from '../utils/auth.js';
 import { validateRequest } from '../utils/validateRequest.js';
-import { userRegisterSchema, userLoginSchema, userUpdateSchema, userProfileUpdateSchema, userChangePasswordSchema } from '../utils/schemas.js'; 
+import { userRegisterSchema, userLoginSchema, userUpdateSchema, userProfileUpdateSchema, userChangePasswordSchema } from '../utils/schemas.js';
 
 const prisma = new PrismaClient();
 const router = Router();

@@ -5,7 +5,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireAdmin } from '../utils/auth.js';
 import { validateRequest } from '../utils/validateRequest.js';
-import { productImageCreateSchema } from '../utils/schemas.js'; 
+import { productImageCreateSchema } from '../utils/schemas.js';
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -18,6 +18,10 @@ router.post('/', authenticateToken, requireAdmin, validateRequest(productImageCr
     try {
         const { productId, url, isPrimary } = req.body;
 
+        // Extrai apenas o nome do ficheiro da URL (suporta múltiplos formatos)
+        // Exemplos: "file.jpg", "/api/images/file.jpg", "http://localhost:3000/api/images/file.jpg"
+        const fileName = url.split('/').pop() || url;
+
         // Se marcada como primária, remover flag de primária em outras imagens do produto
         if (isPrimary) {
             await prisma.productImage.updateMany({
@@ -29,11 +33,11 @@ router.post('/', authenticateToken, requireAdmin, validateRequest(productImageCr
             });
         }
 
-        // Criar nova imagem e associar ao produto
+        // Criar nova imagem e associar ao produto (guardando apenas o nome do ficheiro)
         const newImage = await prisma.productImage.create({
             data: {
                 productId,
-                url,
+                imageUrl: fileName,
                 isPrimary: isPrimary === true,
             },
         });

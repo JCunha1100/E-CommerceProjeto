@@ -52,15 +52,15 @@ export const brandUpdateSchema = z.object({
   logoUrl: z.string().url().optional(),
 }).strict();
 
-// Validação de produtos
+// Validação de produtos (stock pertence às variantes, não ao produto)
 export const productCreateSchema = z.object({
   name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres').max(200),
   slug: z.string().min(1, 'Slug é obrigatório').max(200),
   description: z.string().min(10).max(2000),
   price: z.coerce.number().positive('Preço deve ser positivo'),
-  stock: z.coerce.number().int().min(0, 'Stock não pode ser negativo'),
   categoryId: z.coerce.number().int().positive('ID de categoria inválido'),
   brandId: z.coerce.number().int().positive('ID de marca inválido').optional(),
+  gender: z.enum(['MALE', 'FEMALE'], 'Género é obrigatório (MALE ou FEMALE)'),
   tempFileName: z.string().optional(),
 }).strict();
 
@@ -71,10 +71,10 @@ export const productUpdateSchema = z.object({
   price: z.coerce.number().positive().optional(),
   categoryId: z.coerce.number().int().positive().optional(),
   brandId: z.coerce.number().int().positive().optional(),
+  gender: z.enum(['MALE', 'FEMALE']).optional(),
   isPublished: z.boolean().optional(),
   isFeatured: z.boolean().optional(),
   isNew: z.boolean().optional(),
-  stock: z.coerce.number().int().min(0).optional(),
 }).strict();
 
 // =====================================================
@@ -102,7 +102,7 @@ export const productVariantUpdateSchema = z.object({
 
 export const productImageCreateSchema = z.object({
   productId: z.coerce.number().int().positive('ID de produto inválido'),
-  url: z.string().url('URL de imagem inválida'),
+  url: z.string().min(1, 'URL ou caminho de imagem é obrigatório'),
   isPrimary: z.boolean().optional(),
 }).strict();
 

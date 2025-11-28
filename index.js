@@ -1,6 +1,5 @@
 import express, { raw } from 'express';
 import cors from 'cors';
-import { PrismaClient } from '@prisma/client';
 import userRoutes from './routes/user.js';
 import categoryRoutes from './routes/category.js';
 import brandRoutes from './routes/brand.js';
@@ -16,7 +15,6 @@ import adminRoutes from './routes/admin.js';
 import paymentRoutes, { handleStripeWebhook } from './routes/payment.js';
 import path from 'path';
 
-const prisma = new PrismaClient();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -81,8 +79,4 @@ app.use((req, res) => {
 
 app.listen(PORT, () => {
     console.log(`API a correr em http://localhost:${PORT}`);
-});
-
-process.on('beforeExit', async () => {
-    await prisma.$disconnect();
 });

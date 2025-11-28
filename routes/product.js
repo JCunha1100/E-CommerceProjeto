@@ -79,20 +79,19 @@ router.post('/upload-image', authenticateToken, requireAdmin, upload.single('pro
 // Criar novo produto com inventário e imagem
 router.post('/', authenticateToken, requireAdmin, validateRequest(productCreateSchema), async (req, res) => {
     try {
-        const { 
+        let { 
             name, 
             slug, 
             description, 
             price, 
-            stock, 
             categoryId, 
             brandId,
+            gender,
             tempFileName
         } = req.body;
 
         // Converte valores para tipos corretos
         const numericPrice = parseFloat(price);
-        const numericStock = parseInt(stock || 0);
         const numericCategoryId = parseInt(categoryId);
         const numericBrandId = brandId ? parseInt(brandId) : null;
 
@@ -141,16 +140,9 @@ router.post('/', authenticateToken, requireAdmin, validateRequest(productCreateS
                     slug,
                     description,
                     price: numericPrice,
+                    gender,
                     categoryId: numericCategoryId,
                     brandId: numericBrandId,
-                },
-            });
-            
-            // Cria entrada de inventário
-            await tx.inventory.create({
-                data: {
-                    productId: product.id,
-                    stock: numericStock,
                 },
             });
             
@@ -176,7 +168,8 @@ router.post('/', authenticateToken, requireAdmin, validateRequest(productCreateS
         if (req.body.tempFileName) {
             await fs.unlink(path.join(TEMP_UPLOAD_DIR, req.body.tempFileName)).catch(() => {});
         }
-        console.error('Erro ao criar produto:', error);
+        console.error('Erro completo ao criar produto:', error);
+        console.error('Stack trace:', error.stack);
         // Categoria ou marca não existe
         if (error.code === 'P2003') {
             return res.status(400).json({ error: 'Categoria ou Marca fornecida não existe.' });
@@ -189,13 +182,19 @@ router.post('/', authenticateToken, requireAdmin, validateRequest(productCreateS
 // Listar produtos com filtros e paginação
 router.get('/', async (req, res) => {
     try {
-        const { gender, categorySlug, brandSlug, minPrice, maxPrice, limit = 20, page = 1 } = req.query;
-        const take = parseInt(limit);
-        const skip = (parseInt(page) - 1) * take;
+        const { gender, categorySlug, brandSlug, minPrice, maxPrice } = req.query;
+        // Coerce and sanitize pagination params (handle empty strings and invalid numbers)
+        const rawLimit = req.query.limit;
+        const rawPage = req.query.page;
+        const parsedLimit = parseInt(rawLimit, 10);
+        const parsedPage = parseInt(rawPage, 10);
+        const take = (!isNaN(parsedLimit) && parsedLimit > 0) ? parsedLimit : 20;
+        const pageNum = (!isNaN(parsedPage) && parsedPage > 0) ? parsedPage : 1;
+        const skip = (pageNum - 1) * take;
 
         // Constrói filtros dinâmicos
         const where = {
-            isPublished: true,
+            isActive: true,
             AND: [],
         };
 
@@ -241,7 +240,7 @@ router.get('/', async (req, res) => {
             prisma.product.findMany({
                 where: where,
                 include: {
-                    images: { where: { isPrimary: true }, select: { url: true } },
+                    images: { where: { isPrimary: true }, select: { imageUrl: true } },
                     category: { select: { name: true, slug: true } },
                     brand: { select: { name: true, slug: true } },
                 },
@@ -262,13 +261,13 @@ router.get('/', async (req, res) => {
             gender: product.gender,
             category: product.category,
             brand: product.brand,
-            primaryImageUrl: product.images.length > 0 ? product.images[0].url : null, 
+            primaryImageUrl: product.images.length > 0 ? product.images[0].imageUrl : null, 
         }));
 
         res.status(200).json({
             data: formattedProducts,
             total: totalCount,
-            page: parseInt(page),
+            page: pageNum,
             limit: take,
             totalPages: Math.ceil(totalCount / take),
         });
@@ -289,11 +288,11 @@ router.get('/featured', async (req, res) => {
         // Busca produtos em destaque mais recentes
         const featuredProducts = await prisma.product.findMany({
             where: {
-                isPublished: true,
+                isActive: true,
                 isFeatured: true,
             },
             include: {
-                images: { where: { isPrimary: true }, select: { url: true } },
+                images: { where: { isPrimary: true }, select: { imageUrl: true } },
                 category: { select: { name: true, slug: true } },
                 brand: { select: { name: true, slug: true } },
             },
@@ -310,7 +309,7 @@ router.get('/featured', async (req, res) => {
             description: product.description,
             category: product.category,
             brand: product.brand,
-            primaryImageUrl: product.images.length > 0 ? product.images[0].url : null,
+            primaryImageUrl: product.images.length > 0 ? product.images[0].imageUrl : null,
         }));
 
         res.status(200).json(formattedProducts);
@@ -331,11 +330,11 @@ router.get('/new', async (req, res) => {
         // Busca produtos novos mais recentes
         const newProducts = await prisma.product.findMany({
             where: {
-                isPublished: true,
+                isActive: true,
                 isNew: true,
             },
             include: {
-                images: { where: { isPrimary: true }, select: { url: true } },
+                images: { where: { isPrimary: true }, select: { imageUrl: true } },
                 category: { select: { name: true, slug: true } },
                 brand: { select: { name: true, slug: true } },
             },
@@ -369,31 +368,22 @@ router.get('/:slug', async (req, res) => {
     try {
         const { slug } = req.params;
 
-        // Busca produto com todas as informações relacionadas
+        // Busca produto com informações relacionadas
         const product = await prisma.product.findUnique({
-            where: { slug, isPublished: true },
+            where: { slug },
             include: {
-                images: { orderBy: { isPrimary: 'desc' } },
+                images: { orderBy: { isPrimary: 'desc' }, select: { imageUrl: true, altText: true, isPrimary: true } },
                 category: true,
                 brand: true,
-                inventory: { select: { stock: true } },
-                reviews: { select: { rating: true, comment: true, userId: true, createdAt: true }, take: 5 },
                 variants: true,
             },
         });
 
         if (!product) {
-            return res.status(404).json({ error: 'Produto não encontrado ou não publicado.' });
+            return res.status(404).json({ error: 'Produto não encontrado.' });
         }
-        
-        // Simplifica resultado adicionando stock diretamente
-        const productWithStock = {
-            ...product,
-            stock: product.inventory?.stock ?? 0,
-            inventory: undefined,
-        };
 
-        res.status(200).json(productWithStock);
+        res.status(200).json(product);
     } catch (error) {
         console.error('Erro ao obter produto por slug:', error);
         res.status(500).json({ error: 'Falha interna do servidor ao obter produto.' });
@@ -414,8 +404,7 @@ router.put('/:id', authenticateToken, requireAdmin, validateRequest(productUpdat
             brandId, 
             isPublished,
             isFeatured,
-            isNew,
-            stock
+            isNew
         } = req.body;
         
         // Prepara dados a atualizar (apenas campos fornecidos)
@@ -426,7 +415,7 @@ router.put('/:id', authenticateToken, requireAdmin, validateRequest(productUpdat
             price: price !== undefined ? parseFloat(price) : undefined,
             categoryId: categoryId !== undefined ? parseInt(categoryId) : undefined,
             brandId: brandId !== undefined ? parseInt(brandId) : undefined,
-            isPublished,
+            isActive: isPublished,
             isFeatured,
             isNew,
         };
@@ -439,26 +428,13 @@ router.put('/:id', authenticateToken, requireAdmin, validateRequest(productUpdat
             }
         }
         
-        // Atualiza produto e inventário em transação
-        const [updatedProduct, updatedInventory] = await prisma.$transaction([
-            prisma.product.update({
-                where: { id: productId },
-                data: dataToUpdate,
-            }),
-            // Atualiza stock se fornecido
-            stock !== undefined ? prisma.inventory.update({
-                where: { productId: productId },
-                data: { stock: parseInt(stock) },
-            }) : Promise.resolve(null),
-        ]);
-
-        // Retorna resultado com stock incluído
-        const productResponse = { 
-            ...updatedProduct, 
-            stock: updatedInventory ? updatedInventory.stock : undefined
-        };
+        // Atualiza produto (stock é gerido através de variantes, não aqui)
+        const updatedProduct = await prisma.product.update({
+            where: { id: productId },
+            data: dataToUpdate,
+        });
         
-        res.status(200).json(productResponse);
+        res.status(200).json(updatedProduct);
 
     } catch (error) {
         // Produto não encontrado
@@ -479,15 +455,13 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
         // Obtém URLs de imagens para eliminação posterior
         const productImages = await prisma.productImage.findMany({
             where: { productId },
-            select: { url: true },
+            select: { imageUrl: true },
         });
 
         // Elimina produto e dados relacionados em transação
         await prisma.$transaction(async (tx) => {
-            // Remove dados relacionados
+            // Remove dados relacionados (em cascata)
             await tx.productImage.deleteMany({ where: { productId } });
-            await tx.inventory.deleteMany({ where: { productId } });
-            await tx.review.deleteMany({ where: { productId } });
             await tx.productVariant.deleteMany({ where: { productId } });
 
             // Remove produto
@@ -496,7 +470,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
 
         // Elimina ficheiros de imagem do servidor
         for (const image of productImages) {
-            const fileName = image.url.split('/').pop();
+            const fileName = image.imageUrl.split('/').pop();
             const filePath = path.join(FINAL_UPLOAD_DIR, fileName);
             
             // Falha silenciosa se ficheiro não existir

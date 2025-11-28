@@ -9,6 +9,7 @@ import { validateRequest } from '../utils/validateRequest.js';
 import { cartItemAddSchema, cartItemUpdateSchema } from '../utils/schemas.js';
 
 const prisma = new PrismaClient();
+console.log('Cart - Prisma instance created:', !!prisma);
 const router = Router();
 
 // =================================================================
@@ -17,19 +18,22 @@ const router = Router();
 // Recuperar carrinho ativo ou criar novo, com atualização automática de totais
 router.get('/', authenticateToken, async (req, res) => {
     try {
+        console.log('Cart GET - Prisma type:', typeof prisma, prisma ? 'DEFINED' : 'UNDEFINED');
         const userId = req.user.id;
 
         // Procurar carrinho ativo existente do utilizador
+        const where = { 
+            userId: userId,
+            cartStatus: 'ACTIVE',
+        };
+
         let cart = await prisma.cart.findFirst({
-            where: {
-                userId: userId,
-                cartStatus: 'ACTIVE',
-            },
+            where,
             include: {
                 items: {
                     include: {
                         product: {
-                            select: { id: true, name: true, slug: true, imageUrl: true }
+                            select: { id: true, name: true, slug: true }
                         },
                         variant: true,
                     },
@@ -62,7 +66,7 @@ router.get('/', authenticateToken, async (req, res) => {
                 include: {
                     items: {
                         include: {
-                            product: { select: { id: true, name: true, slug: true, imageUrl: true } },
+                            product: { select: { id: true, name: true, slug: true } },
                             variant: true,
                         },
                         orderBy: { createdAt: 'asc' }
