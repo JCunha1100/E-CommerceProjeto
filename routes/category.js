@@ -59,7 +59,7 @@ router.get('/', async (req, res) => {
             where: { parentId: null },
             include: {
                 // Incluir subcategorias ordenadas alfabeticamente
-                children: {
+                subcategories: {
                     select: {
                         id: true,
                         name: true,
@@ -93,7 +93,7 @@ router.get('/:id', async (req, res) => {
             where: { id: categoryId },
             include: {
                 parent: true,   // Categoria pai (se for subcategoria)
-                children: true, // Subcategorias (se for categoria principal)
+                subcategories: true, // Subcategorias (se for categoria principal)
             }
         });
 

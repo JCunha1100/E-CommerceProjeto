@@ -15,16 +15,26 @@ router.post('/', authenticateToken, requireAdmin, validateRequest(brandCreateSch
     try {
         const { name, description, logoUrl } = req.body;
 
+        // Gerar slug URL-friendly a partir do nome da marca
+        const slug = name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+
         // Verifica que o nome é único
-        const existingBrand = await prisma.brand.findUnique({ where: { name } });
+        const existingBrand = await prisma.brand.findFirst({ where: { name } });
         if (existingBrand) {
             return res.status(409).json({ error: 'Já existe uma marca com este nome.' });
+        }
+
+        // Verifica que o slug é único
+        const existingSlug = await prisma.brand.findFirst({ where: { slug } });
+        if (existingSlug) {
+            return res.status(409).json({ error: 'Já existe uma marca com este slug.' });
         }
 
         // Cria marca com logo URL (para exibição no frontend)
         const newBrand = await prisma.brand.create({
             data: {
                 name,
+                slug,
                 description: description || null,
                 logoUrl,
             },
@@ -90,16 +100,28 @@ router.put('/:id', authenticateToken, requireAdmin, validateRequest(brandUpdateS
 
         // Construir objeto de atualização apenas com campos fornecidos
         const dataToUpdate = {};
-        if (name !== undefined) dataToUpdate.name = name;
+        if (name !== undefined) {
+            dataToUpdate.name = name;
+            // Gerar novo slug se nome mudar
+            dataToUpdate.slug = name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+        }
         if (description !== undefined) dataToUpdate.description = description;
         if (logoUrl !== undefined) dataToUpdate.logoUrl = logoUrl;
 
         // Validar unicidade do nome ao atualizar
         if (dataToUpdate.name) {
-            const existingBrand = await prisma.brand.findUnique({ where: { name: dataToUpdate.name } });
+            const existingBrand = await prisma.brand.findFirst({ where: { name: dataToUpdate.name } });
             // Permitir manter o mesmo nome, mas bloquear duplicatas de outras marcas
             if (existingBrand && existingBrand.id !== brandId) {
                 return res.status(409).json({ error: 'Já existe outra marca com este nome.' });
+            }
+        }
+
+        // Validar unicidade do novo slug
+        if (dataToUpdate.slug) {
+            const existingSlug = await prisma.brand.findFirst({ where: { slug: dataToUpdate.slug } });
+            if (existingSlug && existingSlug.id !== brandId) {
+                return res.status(409).json({ error: 'O novo slug já está a ser usado por outra marca.' });
             }
         }
 
