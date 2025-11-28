@@ -1,0 +1,342 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") 
+}
+
+// =================================================================
+// 2. Enums
+// =================================================================
+
+// CORREÇÃO: Enum com apenas MALE e FEMALE
+enum Gender {
+  MALE    // Homem
+  FEMALE  // Mulher
+}
+
+enum AddressType {
+  billing
+  shipping
+}
+
+enum OrderStatus {
+  pending
+  processing
+  shipped
+  delivered
+  cancelled
+}
+
+enum FinancialStatus {
+  pending
+  paid
+  refunded
+  voided
+}
+
+enum FulfillmentStatus {
+  unfulfilled
+  fulfilled
+  partial
+  returned
+}
+
+enum CartStatus {
+  ACTIVE
+  ABANDONED
+  CHECKED_OUT
+}
+
+enum Role {
+  USER
+  ADMIN
+  OWNER
+}
+
+// =================================================================
+// 3. Modelos (Mapeamento das Tabelas)
+// =================================================================
+
+model User {
+  id              Int           @id @default(autoincrement())
+  email           String        @unique
+  passwordHash    String
+  firstName       String        @map("first_name")
+  lastName        String        @map("last_name")
+  phone           String?
+  dateOfBirth     DateTime?     @map("date_of_birth") @db.Date 
+  role            Role          @default(USER) @map("role")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at")
+
+  // Relações (FKs)
+  addresses       UserAddress[]
+  orders          Order[]
+  shoppingCart    ShoppingCart?
+  wishlistItems   Wishlist[]
+
+  @@map("users")
+}
+
+model UserAddress {
+  id              Int           @id @default(autoincrement())
+  userId          Int           @map("user_id") // FK
+  type            AddressType   
+  company         String?
+  addressLine1    String        @map("address_line_1")
+  city            String
+  state           String?
+  postalCode      String        @map("postal_code")
+  country         String        @default("Portugal")
+  isDefault       Boolean       @default(false) @map("is_default")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  // Relações (FKs)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_addresses")
+}
+
+model Category {
+  id              Int           @id @default(autoincrement())
+  name            String
+  slug            String        @unique
+  parentId        Int?          @map("parent_id") // FK para self-relation
+  description     String?       @db.Text
+  imageUrl        String?       @map("image_url") @db.VarChar(500)
+  isActive        Boolean       @default(true) @map("is_active")
+  sortOrder       Int           @default(0) @map("sort_order")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  // Relações (FKs)
+  parent          Category?     @relation("Subcategories", fields: [parentId], references: [id])
+  subcategories   Category[]    @relation("Subcategories")
+  products        Product[]
+
+  @@map("categories")
+}
+
+model Brand {
+  id              Int           @id @default(autoincrement())
+  name            String
+  slug            String        @unique
+  description     String?       @db.Text
+  logoUrl         String?       @map("logo_url") @db.VarChar(500)
+  websiteUrl      String?       @map("website_url") @db.VarChar(500)
+  isActive        Boolean       @default(true) @map("is_active")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  // Relações (FKs)
+  products        Product[]
+
+  @@map("brands")
+}
+
+model Product {
+  id                              Int             @id @default(autoincrement())
+  name                            String
+  slug                            String          @unique
+  description                     String?         @db.Text
+  shortDescription                String?         @map("short_description") @db.Text
+  sku                             String          @unique 
+  brandId                         Int?            @map("brand_id") // FK
+  categoryId                      Int?            @map("category_id") // FK
+  
+  // Distinção de género (requisito)
+  // O default UNISEX foi removido, tornando este campo obrigatório (Gender sem ?)
+  gender                          Gender 
+
+  price                           Decimal?        @db.Decimal(10, 2)
+  comparePrice                    Decimal?        @map("compare_price") @db.Decimal(10, 2)
+  costPrice                       Decimal?        @map("cost_price") @db.Decimal(10, 2)
+  trackInventory                  Boolean         @default(true) @map("track_inventory")
+  continueSellingWhenOutOfStock   Boolean         @default(false) @map("continue_selling_when_out_of_stock")
+  requiresShipping                Boolean         @default(true) @map("requires_shipping")
+  isTaxable                       Boolean         @default(true) @map("is_taxable")
+  weight                          Decimal?        @db.Decimal(8, 2)
+  isNew                           Boolean         @default(false) @map("is_new")
+  isActive                        Boolean         @default(true) @map("is_active")
+  isFeatured                      Boolean         @default(false) @map("is_featured")
+  metaTitle                       String?         @map("meta_title") @db.VarChar(255)
+  metaDescription                 String?         @map("meta_description") @db.Text
+  createdAt                       DateTime        @default(now()) @map("created_at")
+  updatedAt                       DateTime        @default(now()) @updatedAt @map("updated_at")
+
+  // Relações (FKs)
+  brand                           Brand?          @relation(fields: [brandId], references: [id])
+  category                        Category?       @relation(fields: [categoryId], references: [id])
+  variants                        ProductVariant[]
+  images                          ProductImage[]
+  lineItems                       OrderLineItem[]
+  cartItems                       CartItem[]
+  wishlistItems                   Wishlist[]
+
+  @@map("products")
+}
+
+// Tabela de Variações de Produto (Chave para o STOCK e Tamanho)
+model ProductVariant {
+  id              Int           @id @default(autoincrement())
+  productId       Int           @map("product_id") // FK para Product
+  sku             String        @unique // SKU da Variação (ex: TSHIRT-M)
+  title           String        // Ex: "T-Shirt - Tamanho M"
+  
+  // Campo que garante o stock por tamanho (requisito)
+  size            String        // Tamanho (S, M, L, 40, 42, etc.)
+  
+  stock           Int           @default(0) // O STOCK real por tamanho
+  price           Decimal       @db.Decimal(10, 2)
+  comparePrice    Decimal?      @map("compare_price") @db.Decimal(10, 2)
+  costPrice       Decimal       @map("cost_price") @db.Decimal(10, 2)
+  weight          Decimal?      @db.Decimal(8, 2)
+  isActive        Boolean       @default(true) @map("is_active")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  // Relações (FKs)
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  lineItems       OrderLineItem[]
+  cartItems       CartItem[]
+  wishlistItems   Wishlist[]
+
+  // CRÍTICO: Garante que cada produto só tem um stock por tamanho
+  @@unique([productId, size])
+  @@map("product_variants")
+}
+
+model ProductImage {
+  id              Int           @id @default(autoincrement())
+  productId       Int           @map("product_id") // FK
+  imageUrl        String        @map("image_url") @db.VarChar(500)
+  altText         String?       @map("alt_text") @db.VarChar(255)
+  sortOrder       Int?          @default(0) @map("sort_order")
+  isPrimary       Boolean?      @default(false) @map("is_primary")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  // Relações (FKs)
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_images")
+}
+
+// =================================================================
+// TABELAS DE OPÇÕES REMOVIDAS PARA SIMPLIFICAÇÃO DO STOCK POR TAMANHO
+// ProductOption, ProductOptionValue, VariantOptionValue
+// =================================================================
+
+model Order {
+  id                  Int                 @id @default(autoincrement())
+  orderNumber         String              @unique @map("order_number")
+  userId              Int?                @map("user_id") // FK
+  email               String
+  status              OrderStatus         @default(pending)
+  financialStatus     FinancialStatus     @default(pending) @map("financial_status")
+  fulfillmentStatus   FulfillmentStatus   @default(unfulfilled) @map("fulfillment_status")
+  subtotal            Decimal             @db.Decimal(10, 2)
+  taxAmount           Decimal?            @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  shippingAmount      Decimal?            @default(0) @map("shipping_amount") @db.Decimal(10, 2)
+  discountAmount      Decimal?            @default(0) @map("discount_amount") @db.Decimal(10, 2) 
+  totalAmount         Decimal             @map("total_amount") @db.Decimal(10, 2)
+  currency            String              @default("EUR") @db.VarChar(3)
+  notes               String?             @db.Text
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @default(now()) @updatedAt @map("updated_at")
+
+  // Relações (FKs)
+  user                User?               @relation(fields: [userId], references: [id])
+  transactions        OrderTransaction[]
+  lineItems           OrderLineItem[]
+
+  @@map("orders")
+}
+
+model OrderTransaction {
+  id                  Int           @id @default(autoincrement())
+  orderId             Int           @map("order_id") // FK
+  stripeId            String        @unique @map("stripe_id") @db.VarChar(255)
+  stripeObjectType    String        @map("stripe_object_type")
+  status              String
+  paymentMethod       String?       @map("payment_method")
+  amount              Decimal       @db.Decimal(10, 2)
+  currency            String        @default("EUR") @db.VarChar(3)
+  feeAmount           Decimal?      @default(0.00) @map("fee_amount") @db.Decimal(10, 2)
+  createdAt           DateTime      @default(now()) @map("created_at")
+
+  // Relações (FKs)
+  order               Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_transactions")
+}
+
+model OrderLineItem {
+  id                  Int           @id @default(autoincrement())
+  orderId             Int           @map("order_id") // FK
+  productId           Int?          @map("product_id") // FK
+  variantId           Int           @map("variant_id") // FK para a Variação (Stock)
+  quantity            Int
+  price               Decimal       @db.Decimal(10, 2)
+  total               Decimal       @db.Decimal(10, 2)
+  title               String
+  variantTitle        String?       @map("variant_title")
+  sku                 String?
+
+  // Relações (FKs)
+  order               Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product             Product?      @relation(fields: [productId], references: [id])
+  variant             ProductVariant @relation(fields: [variantId], references: [id]) // FK CRÍTICA: Liga à variação com stock
+  
+  @@map("order_line_items")
+}
+
+model ShoppingCart {
+  id              Int           @id @default(autoincrement())
+  userId          Int?          @unique @map("user_id") // FK
+  sessionId       String?       @unique @map("session_id") 
+  cartStatus      CartStatus    @default(ACTIVE) @map("cart_status")
+  totalPrice      Decimal       @default(0.00) @map("total_price") @db.Decimal(10, 2)
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at")
+
+  // Relações (FKs)
+  user            User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items           CartItem[]
+
+  @@map("shopping_carts")
+}
+
+model CartItem {
+  id              Int           @id @default(autoincrement())
+  cartId          Int           @map("cart_id") // FK
+  productId       Int           @map("product_id") // FK
+  variantId       Int           @map("variant_id") // FK para a Variação (Stock)
+  quantity        Int           @default(1)
+  itemPrice       Decimal       @map("item_price") @db.Decimal(10, 2) // Preço unitário no momento da adição
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at")
+
+  // Relações (FKs)
+  cart            ShoppingCart  @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant         ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade) // FK CRÍTICA: Liga à variação com stock
+
+  @@unique([cartId, variantId]) // Um carrinho só pode ter um item de uma variação (tamanho)
+  @@map("cart_items")
+}
+
+model Wishlist {
+  id              Int           @id @default(autoincrement())
+  userId          Int           @map("user_id") // FK
+  productId       Int           @map("product_id") // FK
+  variantId       Int           @map("variant_id") // FK
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  // Relações (FKs)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant         ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@unique([userId, variantId])
+  @@map("wishlists")
+}
