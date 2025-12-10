@@ -2,13 +2,11 @@
 // Painel administrativo: gestão de pedidos, utilizadores, relatórios
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import { authenticateToken, requireAdmin, requireOwner } from '../utils/auth.js';
 import { validateRequest } from '../utils/validateRequest.js';
 import { orderStatusUpdateSchema, fulfillmentStatusUpdateSchema } from '../utils/schemas.js';
 import { Decimal } from '@prisma/client/runtime/library';
-
-const prisma = new PrismaClient();
 const router = Router();
 
 // =================================================================

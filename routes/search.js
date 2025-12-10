@@ -2,9 +2,7 @@
 // Pesquisa de produtos com filtros avançados
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../db.js';
 const router = Router();
 
 // =================================================================

@@ -2,12 +2,10 @@
 // Gerencia variações de produtos (tamanhos, preços ajustados, inventário)
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import { authenticateToken, requireAdmin } from '../utils/auth.js';
 import { validateRequest } from '../utils/validateRequest.js';
 import { productVariantCreateSchema, productVariantUpdateSchema } from '../utils/schemas.js';
-
-const prisma = new PrismaClient();
 const router = Router();
 
 // Criar nova variação de produto (tamanho/preço específicos)

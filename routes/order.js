@@ -2,13 +2,11 @@
 // Gerencia pedidos de compra (criar, listar, atualizar status)
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import { authenticateToken } from '../utils/auth.js';
 import { calculateTotalPrice } from '../utils/cartUtils.js';
 import { validateRequest } from '../utils/validateRequest.js';
 import { orderCreateSchema } from '../utils/schemas.js';
-
-const prisma = new PrismaClient();
 const router = Router();
 
 // =================================================================
@@ -23,7 +21,7 @@ router.post('/', authenticateToken, validateRequest(orderCreateSchema), async (r
         // Executar checkout em transação para garantir consistência de dados
         const order = await prisma.$transaction(async (tx) => {
             // 1. Procurar carrinho ativo do utilizador
-            const activeCart = await tx.cart.findFirst({
+            const activeCart = await tx.shoppingCart.findFirst({
                 where: { userId: userId, cartStatus: 'ACTIVE' },
                 include: {
                     items: {
@@ -50,11 +48,12 @@ router.post('/', authenticateToken, validateRequest(orderCreateSchema), async (r
             const newOrder = await tx.order.create({
                 data: {
                     userId: userId,
-                    orderStatus: 'PENDING',
-                    totalPrice: calculatedTotal,
-                    shippingAddress: shippingAddress,
-                    paymentMethod: paymentMethod,
+                    status: 'pending',
+                    totalAmount: calculatedTotal,
+                    subtotal: calculatedTotal,
                     notes: notes,
+                    email: req.user.email,
+                    orderNumber: `ORD-${Date.now()}`,
                 },
             });
 
@@ -64,21 +63,22 @@ router.post('/', authenticateToken, validateRequest(orderCreateSchema), async (r
                 productId: item.productId,
                 variantId: item.variantId,
                 quantity: item.quantity,
-                priceAtPurchase: item.itemPrice, 
+                price: item.itemPrice,
+                total: item.itemPrice * item.quantity,
+                title: item.product?.name || 'Product',
             }));
             
             // 6. Guardar items do pedido
-            await tx.orderItem.createMany({
+            await tx.orderLineItem.createMany({
                 data: orderItemsData,
             });
 
-            // 7. Marcar carrinho como COMPLETED e associar ao pedido
-            await tx.cart.update({
+            // 7. Marcar carrinho como CHECKED_OUT
+            await tx.shoppingCart.update({
                 where: { id: activeCart.id },
                 data: {
-                    cartStatus: 'COMPLETED',
-                    completedAt: new Date(),
-                    orderId: newOrder.id, 
+                    cartStatus: 'CHECKED_OUT',
+                    updatedAt: new Date(),
                 },
             });
             
@@ -95,8 +95,8 @@ router.post('/', authenticateToken, validateRequest(orderCreateSchema), async (r
         res.status(201).json({ 
             message: 'Pedido criado com sucesso. O seu carrinho foi finalizado.',
             orderId: order.id,
-            total: order.totalPrice,
-            status: order.orderStatus
+            total: order.totalAmount,
+            status: order.status
         });
 
     } catch (error) {
@@ -122,9 +122,9 @@ router.get('/', authenticateToken, async (req, res) => {
         const orders = await prisma.order.findMany({
             where: { userId: userId },
             include: { 
-                items: {
+                lineItems: {
                     include: { 
-                        product: { select: { id: true, name: true, imageUrl: true } },
+                        product: { select: { id: true, name: true, slug: true } },
                         variant: true
                     } 
                 } 
@@ -153,9 +153,9 @@ router.get('/:orderId', authenticateToken, async (req, res) => {
         const order = await prisma.order.findUnique({
             where: { id: orderId },
             include: { 
-                items: {
+                lineItems: {
                     include: { 
-                        product: { select: { id: true, name: true, imageUrl: true, slug: true } },
+                        product: { select: { id: true, name: true, slug: true } },
                         variant: true
                     } 
                 } 

@@ -153,7 +153,6 @@ model Product {
   comparePrice                    Decimal?        @map("compare_price") @db.Decimal(10, 2)
   costPrice                       Decimal?        @map("cost_price") @db.Decimal(10, 2)
   trackInventory                  Boolean         @default(true) @map("track_inventory")
-  continueSellingWhenOutOfStock   Boolean         @default(false) @map("continue_selling_when_out_of_stock")
   requiresShipping                Boolean         @default(true) @map("requires_shipping")
   isTaxable                       Boolean         @default(true) @map("is_taxable")
   weight                          Decimal?        @db.Decimal(8, 2)

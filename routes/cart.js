@@ -2,14 +2,11 @@
 // Gerencia carrinho de compras do utilizador (adicionar, atualizar, remover itens)
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import { authenticateToken } from '../utils/auth.js';
 import { calculateTotalPrice } from '../utils/cartUtils.js';
 import { validateRequest } from '../utils/validateRequest.js';
 import { cartItemAddSchema, cartItemUpdateSchema } from '../utils/schemas.js';
-
-const prisma = new PrismaClient();
-console.log('Cart - Prisma instance created:', !!prisma);
 const router = Router();
 
 // =================================================================
@@ -18,7 +15,6 @@ const router = Router();
 // Recuperar carrinho ativo ou criar novo, com atualização automática de totais
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        console.log('Cart GET - Prisma type:', typeof prisma, prisma ? 'DEFINED' : 'UNDEFINED');
         const userId = req.user.id;
 
         // Procurar carrinho ativo existente do utilizador
@@ -27,7 +23,7 @@ router.get('/', authenticateToken, async (req, res) => {
             cartStatus: 'ACTIVE',
         };
 
-        let cart = await prisma.cart.findFirst({
+        let cart = await prisma.shoppingCart.findFirst({
             where,
             include: {
                 items: {
@@ -44,7 +40,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
         // Se não existe, criar novo carrinho ativo
         if (!cart) {
-            cart = await prisma.cart.create({
+            cart = await prisma.shoppingCart.create({
                 data: {
                     userId: userId,
                     cartStatus: 'ACTIVE',
@@ -60,7 +56,7 @@ router.get('/', authenticateToken, async (req, res) => {
         
         // Atualizar total se diferente do valor armazenado
         if (cart.totalPrice !== totalPrice) {
-            cart = await prisma.cart.update({
+            cart = await prisma.shoppingCart.update({
                 where: { id: cart.id },
                 data: { totalPrice: totalPrice },
                 include: {
@@ -94,12 +90,12 @@ router.post('/items', authenticateToken, validateRequest(cartItemAddSchema), asy
 
     try {
         // Procurar ou criar carrinho ativo do utilizador
-        let cart = await prisma.cart.findFirst({
+        let cart = await prisma.shoppingCart.findFirst({
             where: { userId, cartStatus: 'ACTIVE' },
         });
 
         if (!cart) {
-            cart = await prisma.cart.create({
+            cart = await prisma.shoppingCart.create({
                 data: { userId, cartStatus: 'ACTIVE', totalPrice: 0.00 },
             });
         }
@@ -160,7 +156,7 @@ router.post('/items', authenticateToken, validateRequest(cartItemAddSchema), asy
         const allItems = await prisma.cartItem.findMany({ where: { cartId } });
         const newTotalPrice = calculateTotalPrice(allItems);
         
-        await prisma.cart.update({
+        await prisma.shoppingCart.update({
             where: { id: cartId },
             data: { totalPrice: newTotalPrice }
         });
@@ -214,7 +210,7 @@ router.put('/items/:itemId', authenticateToken, validateRequest(cartItemUpdateSc
         const allItems = await prisma.cartItem.findMany({ where: { cartId: cartItem.cartId } });
         const newTotalPrice = calculateTotalPrice(allItems);
         
-        await prisma.cart.update({
+        await prisma.shoppingCart.update({
             where: { id: cartItem.cartId },
             data: { totalPrice: newTotalPrice }
         });
@@ -266,7 +262,7 @@ router.delete('/items/:itemId', authenticateToken, async (req, res) => {
         const allItems = await prisma.cartItem.findMany({ where: { cartId } });
         const newTotalPrice = calculateTotalPrice(allItems);
         
-        await prisma.cart.update({
+        await prisma.shoppingCart.update({
             where: { id: cartId },
             data: { totalPrice: newTotalPrice }
         });

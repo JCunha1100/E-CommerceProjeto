@@ -2,12 +2,10 @@
 // Gerencia lista de desejos do utilizador
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import { authenticateToken } from '../utils/auth.js';
 import { validateRequest } from '../utils/validateRequest.js';
 import { wishlistAddSchema } from '../utils/schemas.js';
-
-const prisma = new PrismaClient();
 const router = Router();
 
 // =================================================================
@@ -28,7 +26,7 @@ router.get('/', authenticateToken, async (req, res) => {
                         slug: true,
                         price: true,
                         description: true,
-                        images: { where: { isPrimary: true }, select: { url: true } },
+                        images: { where: { isPrimary: true }, select: { imageUrl: true } },
                     },
                 },
                 variant: {

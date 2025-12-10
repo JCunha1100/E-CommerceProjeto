@@ -2,12 +2,10 @@
 // Gerencia endereços de envio do utilizador
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import { authenticateToken } from '../utils/auth.js';
 import { validateRequest } from '../utils/validateRequest.js';
 import { addressCreateSchema, addressUpdateSchema } from '../utils/schemas.js';
-
-const prisma = new PrismaClient();
 const router = Router();
 
 // =================================================================

@@ -8,6 +8,7 @@
     "dev": "nodemon index.js",
     "start": "node index.js",
     "migrate": "prisma migrate dev --name ecommerce_db",
+    "seed": "node prisma/seed.js",
     "studio": "prisma studio",
     "postinstall": "prisma generate"
   },

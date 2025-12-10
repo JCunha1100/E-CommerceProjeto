@@ -2,12 +2,10 @@
 // Processamento de pagamentos com Stripe (WIP - ainda em desenvolvimento)
 
 import { Router, raw } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import { authenticateToken } from '../utils/auth.js';
 import Stripe from 'stripe';
 import { Decimal } from '@prisma/client/runtime/library';
-
-const prisma = new PrismaClient();
 const router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;

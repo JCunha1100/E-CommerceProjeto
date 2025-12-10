@@ -2,15 +2,13 @@
 // Gerencia produtos: criação, leitura, atualização, eliminação e upload de imagens
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import { authenticateToken, requireAdmin } from '../utils/auth.js';
 import { validateRequest } from '../utils/validateRequest.js';
 import { productCreateSchema, productUpdateSchema } from '../utils/schemas.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
-
-const prisma = new PrismaClient();
 const router = Router();
 
 // Caminhos para diretórios de upload

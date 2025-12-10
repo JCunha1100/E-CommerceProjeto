@@ -2,12 +2,10 @@
 // Gerencia galeria de imagens de produtos
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import { authenticateToken, requireAdmin } from '../utils/auth.js';
 import { validateRequest } from '../utils/validateRequest.js';
 import { productImageCreateSchema } from '../utils/schemas.js';
-
-const prisma = new PrismaClient();
 const router = Router();
 
 // =================================================================
